@@ -1,22 +1,19 @@
-SELECT
-  tag,
-  COUNT(*) AS count
+SELECT '#' || tag AS tag, count(*) AS count
 FROM (
-  SELECT DISTINCT
-    id,
-    elem ->> 'text' AS tag
-  FROM tweets_jsonb,
-       LATERAL jsonb_array_elements(
-         COALESCE(
-           data -> 'entities' -> 'hashtags',
-           data -> 'extended_tweet' -> 'entities' -> 'hashtags',
-           '[]'::jsonb
-         )
-       ) AS elem
-  WHERE to_tsvector('english', data ->> 'text') @@ to_tsquery('english', 'coronavirus')
-    AND data ->> 'lang' = 'en'
-) AS t
-WHERE tag IS NOT NULL
+    SELECT DISTINCT
+        data->>'id' AS id_tweet,
+        jsonb_array_elements_text(
+            coalesce(
+                data->'extended_tweet'->'entities'->'hashtags',
+                data->'entities'->'hashtags',
+                '[]'
+            )
+        )::jsonb ->> 'text' AS tag
+    FROM tweets_jsonb
+    WHERE
+        to_tsvector('english', coalesce(data->'extended_tweet'->>'full_text', data->>'text')) @@ to_tsquery('english', 'coronavirus')
+        AND data->>'lang' = 'en'
+) t
 GROUP BY tag
 ORDER BY count DESC, tag
 LIMIT 1000;
